@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from random import randint
 from tqdm import tqdm
-
+# TODO: rand seed
 # Set parameters of bearing observation
 
 a0 = 1  # initial level of alternation
@@ -33,15 +33,15 @@ def linear_func(k, a0, t0, t):
     return res
 
 
-num_points = 0
+
 t = np.ndarray
 alt_noised = np.ndarray
-alt = np.ndarray
+# alt = np.ndarray
 M = 200  # Quantity of random sets (less than 2^N)
 q = 10  # Confidence parameter
 conf = str(int((1 - q / M) * 100))
 
-N = 3  # Number of data points to SPS analysis
+N = 7  # Number of data points to SPS analysis
 
 Beta = np.ones([M, N])
 
@@ -50,16 +50,16 @@ def set_values(_input_data):
     global num_points, t, alt_noised
     num_points = _input_data.shape[0]
     t = np.linspace(t0, t_end, num_points)
-    alt = _input_data
-    alt_noised = np.zeros(num_points)
+    # alt = _input_data
+    alt_noised = _input_data
 
-    for i in range(num_points):
+    # for i in range(num_points):
         # if t[i] <= t1:
         #     alt[i] = phi(k1, a0, t0, t[i])
         # if t1 < t[i] <= t2:
         #     alt[i] = phi(k2, a1, t1, t[i])
 
-        alt_noised[i] = alt[i] + 0.02 * randint(-10, 10) * a1
+        # alt_noised[i] = alt[i] + 0.02 * randint(-10, 10) * a1
     #    alt_noised[i] = alt[i] * (1 + 0.01 * randint(-10, 10))
 
 
@@ -103,45 +103,60 @@ def sps_indicator(y0, x0, tExp, altExp, Beta, N, M, q):
     wid1 = 1.1 * wid2
     loop_num = 1
     while inr - inl < k_q - 2 and loop_num < 10:
-        if inr == 1:  # first loop condition
-            ang = np.linspace(low_ang, high_ang, k_q)
-            k_test = np.tan(ang)
-        #           print(k_test)
-        else:
-            k_q = 50
-            k_test = np.linspace(low_k, high_k, k_q)
+        k_test = np.linspace(low_k, high_k, k_q)
         Rank = np.ones(k_q)
-        for s in range(k_q):
-            delta = np.zeros(N)
-            for i in range(N):
-                delta[i] = phi(k_test[s], y0, x0, tExp[i]) - altExp[i]
-            coin = 0
-            H = np.zeros(M)
-            for j in range(M):
-                for i in range(N):
-                    H[j] = H[j] + Beta[j, i] * delta[i]
-                if j != 0:
-                    if abs(H[j]) <= abs(H[0]):
-                        Rank[s] = Rank[s] + 1
-                    if abs(H[j]) == abs(H[0]):
-                        coin += 1
-            #       if coin != 0:
-            #            tinyplus = randrange(coin + 1)
-            #            Rank[k] = Rank[k] + tinyplus
-            if inr == 1:  # first loop condition
-                if 1 < s < k_q - 1:
-                    if Rank[s - 1] == M and Rank[s] < M:
-                        inl = s - 2
-                    #                      print('inl =', inl)
-                    if Rank[s - 1] < M and Rank[s] == M:
-                        inr = s + 1
-            #                      print('inr =', inr)
-            else:
-                if 0 < s < k_q:
-                    if Rank[s - 1] >= M - q and Rank[s] < M - q:
-                        inl = s - 1
-                    if Rank[s - 1] < M - q and Rank[s] >= M - q:
-                        inr = s
+        delta_test = np.zeros((k_q, N))
+        tExp_test = np.broadcast_to(tExp[:, None], (tExp.shape[0], k_q))
+        altExp_test = np.broadcast_to(altExp[:, None], (altExp.shape[0], k_q))
+        temp_k_test = np.broadcast_to(k_test, (N, k_test.shape[0]))
+        delta_test = phi(temp_k_test, y0, x0, tExp_test) - altExp_test
+        H_test = np.zeros((M, k_q))
+        H_test = H_test + Beta @ delta_test
+        H_abs = np.abs(H_test)
+        Rank_test = (H_abs <= H_abs[0, :]).sum(axis=0)
+        max_rank = np.max(Rank_test)
+        inl = max(0, np.argmax(Rank_test < max_rank) - 2)
+        inr = min(Rank_test.shape[0] - 1, Rank_test.shape[0] - np.argmax(Rank_test[::-1] < max_rank) + 1)
+#         if inr == 1:  # first loop condition
+#             ang = np.linspace(low_ang, high_ang, k_q)
+#             k_test = np.tan(ang)
+#         #           print(k_test)
+#         else:
+#             k_q = 50
+#             k_test = np.linspace(low_k, high_k, k_q)
+#         Rank = np.ones(k_q)
+#         for s in range(k_q):
+#             delta = np.zeros(N)
+# # ez
+#             for i in range(N):
+#                 delta[i] = phi(k_test[s], y0, x0, tExp[i]) - altExp[i]
+#             coin = 0
+#             H = np.zeros(M)
+#             for j in range(M):
+#                 for i in range(N):
+#                     H[j] = H[j] + Beta[j, i] * delta[i]
+#                 if j != 0:
+#                     if abs(H[j]) <= abs(H[0]):
+#                         Rank[s] = Rank[s] + 1
+#                     # if abs(H[j]) == abs(H[0]):
+#                     #     coin += 1
+#             #       if coin != 0:
+#             #            tinyplus = randrange(coin + 1)
+#             #            Rank[k] = Rank[k] + tinyplus
+#             if inr == 1:  # first loop condition
+#                 if 1 < s < k_q - 1:
+#                     if Rank[s - 1] == M and Rank[s] < M:
+#                         inl = s - 2
+#                     #                      print('inl =', inl)
+#                     if Rank[s - 1] < M and Rank[s] == M:
+#                         inr = s + 1
+#             #                      print('inr =', inr)
+#             else:
+#                 if 1 < s < k_q - 1:
+#                     if Rank[s - 1] >= M - q and Rank[s] < M - q:
+#                         inl = s - 2
+#                     if Rank[s - 1] < M - q and Rank[s] >= M - q:
+#                         inr = s + 1
         low_k = k_test[inl]
         high_k = k_test[inr]
         wid1 = wid2
